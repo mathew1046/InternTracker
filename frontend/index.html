@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internship Application Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        [v-cloak] { display: none; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans h-screen overflow-hidden flex">
+    <div id="app" class="flex w-full h-full" v-cloak>
+        
+        <!-- Auth Overlay -->
+        <div v-if="!isAuthenticated && !initialLoading" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-50 overflow-y-auto py-8">
+            <div class="bg-white p-8 rounded-xl shadow-lg max-w-md w-full border border-gray-200 m-auto mt-4 mb-4">
+                <div class="text-center mb-6">
+                    <i class="fa-solid fa-rocket text-blue-600 text-3xl mb-2"></i>
+                    <h2 class="text-2xl font-bold">InternTracker</h2>
+                    <p class="text-sm text-gray-500 mt-1">{{ isRegistering ? 'Create your profile' : 'Sign in to continue' }}</p>
+                </div>
+                
+                <form @submit.prevent="handleAuth" class="space-y-4">
+                    <div class="flex gap-4">
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                            <input v-model="authForm.username" type="text" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                            <input v-model="authForm.password" type="password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+
+                    <template v-if="isRegistering">
+                        <div class="border-t border-gray-100 pt-4 mt-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                            <input v-model="authForm.name" type="text" required placeholder="e.g. Jane Doe" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">GitHub (optional)</label>
+                                <input v-model="authForm.github" type="text" placeholder="github.com/..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">LinkedIn (optional)</label>
+                                <input v-model="authForm.linkedin" type="text" placeholder="linkedin.com/in/..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Skills</label>
+                            <div class="border border-gray-300 rounded-lg p-2 max-h-32 overflow-y-auto grid grid-cols-2 gap-1 bg-gray-50">
+                                <label v-for="skill in popularSkills" :key="skill" class="flex items-center space-x-2 text-xs cursor-pointer hover:bg-gray-100 p-1 mb-0 rounded">
+                                    <input type="checkbox" :value="skill" v-model="authForm.skills" class="rounded text-blue-600 focus:ring-blue-500">
+                                    <span>{{skill}}</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Resume (PDF)</label>
+                            <input type="file" @change="handleAuthFileUpload" required accept=".pdf" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-gray-300 rounded-lg">
+                        </div>
+                    </template>
+                    
+                    <div v-if="authError" class="text-red-500 text-sm bg-red-50 p-2 rounded">{{ authError }}</div>
+
+                    <button type="submit" class="w-full bg-blue-600 text-white font-medium py-2.5 rounded-lg hover:bg-blue-700 transition" :disabled="authLoading">
+                        <i v-if="authLoading" class="fa-solid fa-spinner fa-spin mr-2"></i>
+                        {{ isRegistering ? 'Sign Up Profile' : 'Sign In' }}
+                    </button>
+                </form>
+                
+                <div class="mt-4 text-center text-sm text-gray-600">
+                    <button @click="toggleAuthMode" class="text-blue-600 hover:underline">
+                        {{ isRegistering ? 'Already have an account? Sign in' : 'Need an account? Sign up' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="initialLoading" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+            <div class="text-blue-600 text-3xl"><i class="fa-solid fa-circle-notch fa-spin"></i></div>
+        </div>
+
+        <!-- Sidebar Navigation -->
+        <div v-if="isAuthenticated" class="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm flex-shrink-0">
+            <div class="p-6 border-b border-gray-100 flex items-center gap-3">
+                <i class="fa-solid fa-rocket text-blue-600 text-xl"></i>
+                <h1 class="text-xl font-bold font-heading">InternTracker</h1>
+            </div>
+            
+            <div class="px-6 py-3 border-b border-gray-50 flex items-center justify-between bg-blue-50/50">
+                <span class="text-sm font-medium text-blue-800 truncate" :title="user?.username">
+                    <i class="fa-regular fa-circle-user mr-1"></i> {{ user?.username }}
+                </span>
+                <button @click="logout" class="text-gray-400 hover:text-red-500 transition" title="Logout">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </button>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-2">
+                <button @click="currentPage = 'dashboard'" 
+                        class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors"
+                        :class="currentPage === 'dashboard' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
+                    <i class="fa-solid fa-chart-pie w-5 text-center"></i>
+                    Dashboard
+                </button>
+                <button @click="currentPage = 'companies'" 
+                        class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors"
+                        :class="currentPage === 'companies' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
+                    <i class="fa-solid fa-building w-5 text-center"></i>
+                    Companies
+                    <span class="ml-auto bg-gray-100 text-gray-600 text-xs py-1 px-2 rounded-full">{{ activeCompanies.length }}</span>
+                </button>
+                <button @click="currentPage = 'draft'" 
+                        class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors relative"
+                        :class="currentPage === 'draft' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
+                    <i class="fa-solid fa-envelope-open-text w-5 text-center"></i>
+                    Draft Email
+                    <span v-if="selectedCompany" class="absolute right-3 top-3 w-2 h-2 rounded-full bg-red-400"></span>
+                </button>
+                <button @click="currentPage = 'bulk'" 
+                        class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors relative"
+                        :class="currentPage === 'bulk' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
+                    <i class="fa-solid fa-layer-group w-5 text-center"></i>
+                    Bulk Mail
+                </button>
+                <button @click="currentPage = 'settings'" 
+                        class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors relative"
+                        :class="currentPage === 'settings' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'">
+                    <i class="fa-solid fa-gear w-5 text-center"></i>
+                    Settings
+                    <span v-if="!user?.has_app_password" class="absolute right-3 top-3 w-2 h-2 rounded-full bg-yellow-400" title="Missing credentials"></span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Main Content Area -->
+        <main v-if="isAuthenticated" class="flex-1 bg-gray-50 overflow-y-auto p-8">
+            <!-- Dashboard Page -->
+            <transition name="fade" mode="out-in">
+                <div v-if="currentPage === 'dashboard'" class="max-w-5xl mx-auto">
+                    <div class="flex justify-between items-end mb-8">
+                        <div>
+                            <h2 class="text-3xl font-bold text-gray-900">Dashboard</h2>
+                            <p class="text-gray-500 mt-1">Track your internship applications.</p>
+                        </div>
+                        <button @click="loadApplications" class="bg-white border shadow-sm px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2 transition">
+                            <i class="fa-solid fa-rotate-right"></i> Refresh
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xl"><i class="fa-solid fa-paper-plane"></i></div>
+                            <div>
+                                <p class="text-sm text-gray-500 font-medium pb-1">Total Sent</p>
+                                <p class="text-2xl font-bold">{{ applications.filter(a => a.status === 'Sent').length }}</p>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 text-xl"><i class="fa-solid fa-ban"></i></div>
+                            <div>
+                                <p class="text-sm text-gray-500 font-medium pb-1">Ignored</p>
+                                <p class="text-2xl font-bold">{{ applications.filter(a => a.status === 'Ignored').length }}</p>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 text-xl"><i class="fa-solid fa-hourglass-half"></i></div>
+                            <div>
+                                <p class="text-sm text-gray-500 font-medium pb-1">Pending Companies</p>
+                                <p class="text-2xl font-bold">{{ activeCompanies.length }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div class="p-6 border-b border-gray-100">
+                            <h3 class="text-lg font-bold">Recent Application History</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead>
+                                    <tr class="bg-gray-50 border-b border-gray-100 text-sm text-gray-500">
+                                        <th class="p-4 font-medium uppercase">Company</th>
+                                        <th class="p-4 font-medium uppercase">Target Email</th>
+                                        <th class="p-4 font-medium uppercase">Status</th>
+                                        <th class="p-4 font-medium uppercase">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-if="applications.length === 0" class="text-center p-8 text-gray-500"><td colspan="4" class="p-8">No applications recorded yet.</td></tr>
+                                    <tr v-for="app in applications" :key="app.id" class="border-b border-gray-50 hover:bg-gray-50/50 transition text-sm">
+                                        <td class="p-4 font-medium text-gray-800">{{ app.company }}</td>
+                                        <td class="p-4 text-gray-600">{{ app.email || '-' }}</td>
+                                        <td class="p-4">
+                                            <span v-if="app.status === 'Sent'" class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-semibold">Sent</span>
+                                            <span v-if="app.status === 'Ignored'" class="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs font-semibold">Ignored</span>
+                                        </td>
+                                        <td class="p-4 text-gray-500">{{ new Date(app.date).toLocaleDateString() }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Companies Page -->
+                <div v-else-if="currentPage === 'companies'" class="max-w-5xl mx-auto h-full flex flex-col">
+                    <div class="flex justify-between items-end mb-6 flex-shrink-0">
+                        <div>
+                            <h2 class="text-3xl font-bold text-gray-900">Target Companies</h2>
+                            <p class="text-gray-500 mt-1">Select a company to start drafting your email, or ignore to remove.</p>
+                        </div>
+                        <div class="relative">
+                            <i class="fa-solid fa-search absolute left-3 top-3 text-gray-400"></i>
+                            <input v-model="searchQuery" type="text" placeholder="Search companies..." class="pl-10 pr-4 py-2 w-64 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm pb-2">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pb-8 relative">
+                        <div v-for="company in filteredCompanies" :key="company.Name" 
+                             class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-blue-200 transition-all flex flex-col group cursor-pointer"
+                             @click="selectCompanyForDraft(company)">
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-bold text-lg text-gray-900 line-clamp-1" :title="company.Name">{{ company.Name }}</h3>
+                                <span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] uppercase font-bold whitespace-nowrap">{{ company.Category || 'Tech' }}</span>
+                            </div>
+                            
+                            <p class="text-sm text-gray-500 mb-4 line-clamp-2 h-10">{{ company['Short Description'] }}</p>
+                            
+                            <div class="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
+                                <div class="text-xs text-gray-500 flex items-center gap-1">
+                                    <i class="fa-regular fa-envelope"></i> 
+                                    <span class="truncate max-w-[120px]" :title="company.Email">{{ company.Email && company.Email !== '-' ? company.Email : 'No Email' }}</span>
+                                </div>
+                                
+                                <div class="flex gap-2">
+                                    <button @click.stop="ignoreCompany(company)" class="text-gray-400 hover:text-red-500 transition px-2 py-1 tooltip" title="Ignore Company">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                    <button class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-3 py-1 rounded text-sm font-medium transition">
+                                        Draft <i class="fa-solid fa-arrow-right ml-1"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div v-if="filteredCompanies.length === 0" class="col-span-full py-12 text-center text-gray-400">
+                            No companies found matching "{{searchQuery}}".
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Draft Email Page -->
+                <div v-else-if="currentPage === 'draft'" class="max-w-5xl mx-auto flex flex-col h-[calc(100vh-64px)] pb-4">
+                    <div class="mb-4 flex-shrink-0">
+                        <h2 class="text-3xl font-bold text-gray-900">Email Composer</h2>
+                        <p class="text-gray-500 mt-1">Review and refine AI drafted email with attachments.</p>
+                    </div>
+
+                    <div v-if="!selectedCompany" class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center p-8">
+                        <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center text-gray-300 text-3xl mb-4">
+                            <i class="fa-solid fa-envelope-open"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-700 mb-2">No Company Selected</h3>
+                        <p class="text-gray-500 mb-6 max-w-md">Go to the companies page to select a company and start writing your cold email.</p>
+                        <button @click="currentPage = 'companies'" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition font-medium">Browse Companies</button>
+                    </div>
+
+                    <div v-else class="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
+                        
+                        <!-- Main Editor -->
+                        <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col h-full min-h-[500px]">
+                            
+                            <!-- To/Subject Header -->
+                            <div class="space-y-4 mb-4 pb-4 border-b border-gray-100 flex-shrink-0">
+                                <div class="flex items-center gap-3">
+                                    <label class="text-sm font-bold text-gray-500 w-16">To:</label>
+                                    <div class="flex-1 flex gap-2">
+                                        <input v-model="selectedCompany.Email" type="email" class="flex-1 border border-gray-200 rounded-md px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <label class="text-sm font-bold text-gray-500 w-16">Subject:</label>
+                                    <input v-model="emailSubject" type="text" class="flex-1 border border-gray-200 rounded-md px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium">
+                                </div>
+                            </div>
+                            
+                            <!-- Attachment Info -->
+                            <div class="mb-4 flex-shrink-0">
+                                <label class="flex items-center gap-2 text-sm text-gray-600 mb-2 font-medium">
+                                    <i class="fa-solid fa-paperclip"></i> Attachment
+                                </label>
+                                <div class="bg-gray-50 border border-gray-200 rounded-md px-4 py-2 flex items-center justify-between">
+                                    <div class="flex items-center gap-2 text-sm text-gray-700">
+                                        <i class="fa-solid fa-file-pdf text-red-500"></i>
+                                        <span>Your saved resume will be automatically attached.</span>
+                                    </div>
+                                    <i class="fa-solid fa-check text-green-500"></i>
+                                </div>
+                            </div>
+
+                            <!-- Body Textarea -->
+                            <div class="flex-1 flex flex-col relative min-h-[250px]">
+                                <label class="text-sm font-bold text-gray-500 mb-2">Message Body:</label>
+                                <textarea v-model="draftBody" class="flex-1 border border-gray-200 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none font-mono text-sm leading-relaxed whitespace-pre-wrap" placeholder="Type your email..."></textarea>
+                                
+                                <div v-if="drafting || refining" class="absolute inset-0 bg-white/70 backdrop-blur-sm flex flex-col items-center justify-center rounded-lg border border-gray-200 z-10">
+                                    <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-3"></i>
+                                    <p class="font-medium text-gray-700">{{ refining ? 'Refining with AI...' : 'Generating Initial Draft...' }}</p>
+                                </div>
+                            </div>
+
+                            <!-- Action Bar -->
+                            <div class="mt-6 flex justify-between items-center flex-shrink-0 pt-4 border-t border-gray-100">
+                                <button @click="currentPage = 'companies'" class="text-gray-500 hover:text-gray-800 text-sm font-medium px-3 py-2">
+                                    Cancel
+                                </button>
+                                <button @click="sendEmail" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-lg shadow-sm font-medium flex items-center gap-2 transition disabled:opacity-50" :disabled="sending || !draftBody">
+                                    <i v-if="sending" class="fa-solid fa-spinner fa-spin"></i>
+                                    <i v-else class="fa-solid fa-paper-plane"></i>
+                                    {{ sending ? 'Sending...' : 'Send Application' }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Sidebar Tools (Company Info & AI Refine) -->
+                        <div class="lg:w-80 flex flex-col gap-4 flex-shrink-0 overflow-y-auto">
+                            
+                            <!-- Company Context -->
+                            <div class="bg-blue-50 border border-blue-100 rounded-xl p-5 shadow-sm">
+                                <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded uppercase tracking-wider mb-2 inline-block">Target Context</span>
+                                <h3 class="font-bold text-lg text-gray-900 mb-1 line-clamp-1">{{ selectedCompany.Name }}</h3>
+                                <div class="text-xs text-blue-800 mb-3">{{ selectedCompany.Category }}</div>
+                                <p class="text-sm text-gray-700 leading-relaxed mb-3 line-clamp-4">{{ selectedCompany['Short Description'] }}</p>
+                                <a v-if="selectedCompany.Website && selectedCompany.Website !== '-'" 
+                                   :href="selectedCompany.Website.startsWith('http') ? selectedCompany.Website : 'https://' + selectedCompany.Website" 
+                                   target="_blank" class="text-blue-600 text-sm hover:underline font-medium flex items-center gap-1 inline-block mt-1">
+                                    Visit Website <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                                </a>
+                            </div>
+
+                            <!-- Initial Draft Gen -->
+                            <button v-if="!draftBody" @click="generateInitialDraft" class="bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl p-4 shadow text-left hover:shadow-md transition group overflow-hidden relative">
+                                <div class="absolute inset-0 bg-white/20 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition duration-500 ease-in-out"></div>
+                                <div class="font-bold flex items-center gap-2 mb-1"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Draft Email</div>
+                                <div class="text-xs text-purple-100">Let Gemini AI write a personalized cold email.</div>
+                            </button>
+
+                            <!-- AI Assistant / Refiner -->
+                            <div v-if="draftBody" class="bg-white border text-gray-800 border-gray-200 rounded-xl p-5 shadow-sm flex flex-col flex-1 min-h-[250px]">
+                                <div class="font-bold flex items-center gap-2 mb-4 text-purple-700">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> AI Refiner
+                                </div>
+                                <p class="text-xs text-gray-500 mb-3">Ask AI to modify the current text (e.g. "make it more formal", "make it shorter", "mention my python skills")</p>
+                                
+                                <textarea v-model="refinePrompt" class="w-full border border-gray-300 rounded-lg p-3 text-sm mb-3 resize-none h-24 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="E.g., Make it sound more enthusiastic and shorter..."></textarea>
+                                
+                                <div class="mt-auto flex flex-col gap-2">
+                                    <button @click="refineDraft" class="w-full bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200 px-4 py-2 rounded-lg text-sm font-bold transition disabled:opacity-50" :disabled="refining || !refinePrompt">
+                                        <i class="fa-solid fa-bolt mr-1"></i> Apply Changes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Bulk Mail Page -->
+                <div v-else-if="currentPage === 'bulk'" class="max-w-5xl mx-auto h-full flex flex-col">
+                    <div class="flex justify-between items-end mb-6 flex-shrink-0">
+                        <div>
+                            <h2 class="text-3xl font-bold text-gray-900">Bulk Mail Manager</h2>
+                            <p class="text-gray-500 mt-1">Automatically draft, send, or schedule emails directly to multiple companies.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6 flex-shrink-0 flex gap-6">
+                        <div class="flex-1 border-r border-gray-100 pr-6">
+                            <h3 class="font-bold text-gray-800 mb-3 text-sm uppercase">1. Filter Remaining Targets</h3>
+                            <div class="flex gap-4">
+                                <select v-model="bulkCategory" class="border border-gray-300 rounded p-2 text-sm flex-1">
+                                    <option value="">All Categories</option>
+                                    <option v-for="cat in uniqueCategories" :key="cat" :value="cat">{{ cat }}</option>
+                                </select>
+                                <select v-model="bulkSortDirection" class="border border-gray-300 rounded p-2 text-sm w-32">
+                                    <option value="asc">Name A-Z</option>
+                                    <option value="desc">Name Z-A</option>
+                                </select>
+                            </div>
+                            <div class="mt-3 text-sm text-gray-600">
+                                <strong>{{ bulkPendingCompanies.length }}</strong> pending companies | <strong>{{ bulkDraftedCompanies.length }}</strong> drafted | <strong>{{ scheduledCompanyCount }}</strong> scheduled.
+                            </div>
+                        </div>
+                        
+                        <div class="flex-1 border-r border-gray-100 pr-6">
+                            <h3 class="font-bold text-gray-800 mb-3 text-sm uppercase">2. Auto-Generate Drafts</h3>
+                            <p class="text-xs text-gray-500 mb-3">AI will auto-generate email contents for all pending companies. (2s delay each)</p>
+                            <button @click="startBulkDraft" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded shadow-sm text-sm disabled:opacity-50" :disabled="bulkWorking || bulkPendingCompanies.length === 0">
+                                <i v-if="bulkWorkingMode === 'draft'" class="fa-solid fa-spinner fa-spin mr-1"></i>
+                                {{ bulkWorkingMode === 'draft' ? `Drafting... (${bulkProgress}/${bulkTotal})` : `Generate ${bulkPendingCompanies.length} Drafts` }}
+                            </button>
+                        </div>
+
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-800 mb-3 text-sm uppercase">3. Action Drafts</h3>
+                            <div class="flex gap-2 mb-3 items-center">
+                                <button @click="startBulkSendNow" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded shadow-sm text-sm disabled:opacity-50" :disabled="bulkWorking || bulkDraftedCompanies.length === 0">
+                                    <i v-if="bulkWorkingMode === 'send'" class="fa-solid fa-spinner fa-spin mr-1"></i> 
+                                    {{ bulkWorkingMode === 'send' ? `Sending... (${bulkProgress}/${bulkTotal})` : 'Send Now' }}
+                                </button>
+                                <div class="text-xs text-gray-500 flex items-center gap-1 border border-gray-300 rounded px-2 bg-gray-50 h-[36px]">
+                                    <span>Delay (s):</span>
+                                    <input type="number" v-model="bulkDelay" class="bg-transparent w-10 text-center font-bold outline-none" min="1">
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <input type="datetime-local" v-model="bulkScheduleTime" class="border border-gray-300 rounded p-1.5 text-xs flex-1">
+                                <button @click="scheduleBulkDrafts" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded disabled:opacity-50 text-xs font-bold" :disabled="bulkWorking || bulkDraftedCompanies.length === 0 || !bulkScheduleTime">
+                                    Schedule
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 overflow-hidden flex flex-col">
+                        <div class="overflow-y-auto flex-1 p-4">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-50 sticky top-0 z-10">
+                                    <tr class="text-xs text-gray-500 uppercase border-b border-gray-100">
+                                        <th class="p-3">Company</th>
+                                        <th class="p-3">Email</th>
+                                        <th class="p-3">Category</th>
+                                        <th class="p-3">Status</th>
+                                        <th class="p-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="c in bulkFilteredList" :key="c.Name" class="border-b border-gray-50 hover:bg-gray-50 text-sm">
+                                        <td class="p-3 font-medium flex items-center">
+                                            <i v-if="bulkWorkingTarget === c.Name" class="fa-solid fa-circle-notch fa-spin text-indigo-500 mr-2"></i>
+                                            {{ c.Name }}
+                                        </td>
+                                        <td class="p-3 text-gray-600 w-48">
+                                            <template v-if="c.Email && c.Email !== '-'">
+                                                <div class="truncate max-w-[160px]" :title="c.Email">{{ c.Email }}</div>
+                                            </template>
+                                            <template v-else>
+                                                <div class="flex items-center gap-1 group">
+                                                    <span class="text-red-500 text-xs font-bold whitespace-nowrap"><i class="fa-solid fa-triangle-exclamation"></i> Missing info</span>
+                                                    <button @click="addEmail(c)" class="opacity-0 group-hover:opacity-100 ml-2 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded hover:bg-blue-200 transition-opacity">Add</button>
+                                                </div>
+                                            </template>
+                                        </td>
+                                        <td class="p-3 text-gray-500">{{ c.Category }}</td>
+                                        <td class="p-3">
+                                            <span v-if="c.status === 'Drafted'" class="text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded font-bold">Drafted</span>
+                                            <span v-else-if="c.status === 'Scheduled'" class="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold" :title="c.scheduled_date">Scheduled</span>
+                                            <span v-else-if="c.status === 'Pending' || !c.status" class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-bold">Pending</span>
+                                        </td>
+                                        <td class="p-3 text-right whitespace-nowrap">
+                                            <button v-if="c.status === 'Drafted' || c.drafted_email" @click="viewDraftFromBulk(c)" class="text-blue-500 hover:text-blue-700 mr-3 tooltip" title="Review Draft">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                            <button @click="ignoreCompany(c)" class="text-gray-400 hover:text-red-500 tooltip mr-1" title="Remove Company">
+                                                <i class="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="bulkFilteredList.length === 0">
+                                        <td colspan="5" class="p-8 text-center text-gray-400">No matching companies to display. (Sent and Ignored are hidden)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Page -->
+                <div v-else-if="currentPage === 'settings'" class="max-w-2xl mx-auto mt-8">
+                    <div class="mb-8">
+                        <h2 class="text-3xl font-bold text-gray-900">Settings</h2>
+                        <p class="text-gray-500 mt-1">Configure your Google Workspace credentials to send emails directly.</p>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 space-y-6">
+                        
+                        <div class="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800 mb-6 flex gap-3">
+                            <i class="fa-solid fa-circle-info text-blue-500 mt-0.5"></i>
+                            <div>
+                                <strong>How to get an App Password:</strong><br>
+                                1. Go to your <a href="https://myaccount.google.com/security" target="_blank" class="underline font-bold">Google Account Security page</a>.<br>
+                                2. Enable 2-Step Verification if not already on.<br>
+                                3. Search for "App Passwords" and create one for "Mail". <br>
+                                4. Paste the 16-character code below without spaces.
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Google Email Address <span class="text-red-500">*</span></label>
+                            <input v-model="settingsForm.googleEmail" type="email" placeholder="student@gmail.com" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">16-Digit App Password <span class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <input :type="showPassword ? 'text' : 'password'" v-model="settingsForm.googleAppPassword" placeholder="abcd efgh ijkl mnop" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono">
+                                <button @click="showPassword = !showPassword" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+                                    <i class="fa-solid" :class="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2"><i class="fa-solid fa-database text-blue-500"></i> Securely stored in your backend database linked to your account.</p>
+                        </div>
+                        
+                        <div class="pt-4 mt-2 border-t border-gray-100">
+                            <button @click="saveSettings" class="bg-blue-600 text-white font-medium px-6 py-2.5 rounded-lg hover:bg-blue-700 transition w-full" :disabled="savingSettings">
+                                {{ savingSettings ? 'Saving...' : 'Save Configuration' }}
+                            </button>
+                            <div v-if="saveSuccessMsg" class="text-green-600 text-sm mt-3 text-center transition font-medium"><i class="fa-solid fa-check-circle"></i> Saved successfully!</div>
+                        </div>
+                    </div>
+                </div>
+            </transition>
+        </main>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+
+        // Explicitly set the backend API URL for GitHub Pages deployment.
+        // Replace 'YOUR_BACKEND_URL_HERE' with your actual Hugging Face Space URL 
+        // Example: 'https://username-spacename.hf.space'
+        const API_BASE = 'https://0xmathew-interntracker.hf.space';
+
+        createApp({
+            setup() {
+                // Auth State
+                const initialLoading = ref(true);
+                const isAuthenticated = ref(false);
+                const isRegistering = ref(false);
+                const authLoading = ref(false);
+                const authError = ref('');
+                const user = ref(null);
+                const token = ref(localStorage.getItem('token') || null);
+
+                const popularSkills = ['Python', 'JavaScript', 'TypeScript', 'React', 'Vue', 'Node.js', 'Java', 'C++', 'Go', 'Ruby', 'SQL', 'MongoDB', 'PostgreSQL', 'AWS', 'Docker', 'Kubernetes', 'Git', 'Machine Learning', 'Data Analysis', 'HTML/CSS'];
+                const authForm = ref({ username: '', password: '', name: '', github: '', linkedin: '', skills: [] });
+                const authResumeFile = ref(null);
+                
+                const handleAuthFileUpload = (e) => {
+                    if (e.target.files.length > 0) authResumeFile.value = e.target.files[0];
+                    else authResumeFile.value = null;
+                };
+
+                const currentPage = ref('dashboard');
+                
+                const companies = ref([]);
+                const applications = ref([]);
+                const searchQuery = ref('');
+                
+                const activeCompanies = computed(() => {
+                    return companies.value.filter(c => c.status === 'Pending' || !c.status);
+                });
+
+                const filteredCompanies = computed(() => {
+                    let list = activeCompanies.value;
+                    if (searchQuery.value.trim()) {
+                        const q = searchQuery.value.toLowerCase();
+                        list = list.filter(c => 
+                            c.Name?.toLowerCase().includes(q) || 
+                            c.Category?.toLowerCase().includes(q) || 
+                            c['Short Description']?.toLowerCase().includes(q)
+                        );
+                    }
+                    return list;
+                });
+
+                const selectedCompany = ref(null);
+                const drafting = ref(false);
+                const refining = ref(false);
+                const draftBody = ref('');
+                const emailSubject = ref('Application for Internship');
+                const refinePrompt = ref('');
+                
+                const fileInput = ref(null);
+                const resumeFile = ref(null);
+
+                const settingsForm = ref({ googleEmail: '', googleAppPassword: '' });
+                const showPassword = ref(false);
+                const sending = ref(false);
+                const savingSettings = ref(false);
+                const saveSuccessMsg = ref(false);
+
+                // Setup Fetch with Auth header
+                const authFetch = async (url, options = {}) => {
+                    if(!options.headers) options.headers = {};
+                    if(token.value) {
+                        options.headers['Authorization'] = `Bearer ${token.value}`;
+                    }
+                    const res = await fetch(`${API_BASE}${url}`, options);
+                    if (res.status === 401) {
+                        // Token invalid/expired
+                        logout();
+                        throw new Error("Unauthorized");
+                    }
+                    return res;
+                };
+
+                const toggleAuthMode = () => {
+                    isRegistering.value = !isRegistering.value;
+                    authError.value = '';
+                };
+
+                const handleAuth = async () => {
+                    authLoading.value = true;
+                    authError.value = '';
+                    
+                    try {
+                        let res;
+                        if (isRegistering.value) {
+                            if (!authResumeFile.value) {
+                                authError.value = "Resume file is required.";
+                                authLoading.value = false;
+                                return;
+                            }
+                            if (!authForm.value.skills || authForm.value.skills.length === 0) {
+                                authError.value = "Please select at least one skill.";
+                                authLoading.value = false;
+                                return;
+                            }
+
+                            const formData = new FormData();
+                            formData.append('username', authForm.value.username);
+                            formData.append('password', authForm.value.password);
+                            formData.append('name', authForm.value.name);
+                            formData.append('github', authForm.value.github || '');
+                            formData.append('linkedin', authForm.value.linkedin || '');
+                            formData.append('skills', authForm.value.skills.join(', '));
+                            formData.append('resume', authResumeFile.value);
+                            
+                            res = await fetch(`${API_BASE}/api/auth/register`, {
+                                method: 'POST',
+                                body: formData
+                            });
+                        } else {
+                            res = await fetch(`${API_BASE}/api/auth/login`, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({username: authForm.value.username, password: authForm.value.password})
+                            });
+                        }
+                        
+                        const data = await res.json();
+                        
+                        if (!res.ok) {
+                            authError.value = data.detail || 'Authentication failed';
+                            authLoading.value = false;
+                            return;
+                        }
+
+                        if (isRegistering.value) {
+                            isRegistering.value = false;
+                            authForm.value.password = '';
+                            alert("Profile created! Please sign in.");
+                        } else {
+                            token.value = data.token;
+                            localStorage.setItem('token', data.token);
+                            await fetchUser();
+                        }
+                    } catch (e) {
+                        authError.value = "Network error occurred.";
+                    }
+                    authLoading.value = false;
+                };
+
+                const fetchUser = async () => {
+                    if (!token.value) {
+                        initialLoading.value = false;
+                        return;
+                    }
+                    try {
+                        const res = await authFetch('/api/auth/me');
+                        const data = await res.json();
+                        user.value = data;
+                        isAuthenticated.value = true;
+                        
+                        // Prep settings form
+                        settingsForm.value.googleEmail = data.google_email || '';
+                        
+                        // Load Dashboard Data
+                        loadCompanies();
+                        loadApplications();
+                    } catch (e) {
+                        // Already handled by authFetch if 401
+                    }
+                    initialLoading.value = false;
+                };
+
+                const logout = () => {
+                    if(token.value) authFetch('/api/auth/logout', {method: 'POST'}).catch(() => {});
+                    token.value = null;
+                    user.value = null;
+                    isAuthenticated.value = false;
+                    localStorage.removeItem('token');
+                };
+
+                const saveSettings = async () => {
+                    savingSettings.value = true;
+                    try {
+                        const res = await authFetch('/api/settings', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                google_email: settingsForm.value.googleEmail,
+                                google_app_password: settingsForm.value.googleAppPassword
+                            })
+                        });
+                        if (res.ok) {
+                            saveSuccessMsg.value = true;
+                            if(user.value) user.value.has_app_password = true; // Optimistic update
+                            setTimeout(() => saveSuccessMsg.value = false, 3000);
+                        } else {
+                            alert("Failed to save settings");
+                        }
+                    } catch(e) { console.error(e); }
+                    savingSettings.value = false;
+                };
+
+                const handleFileUpload = (e) => {
+                    if (e.target.files.length > 0) {
+                        resumeFile.value = e.target.files[0];
+                    } else {
+                        resumeFile.value = null;
+                    }
+                };
+
+                const clearFile = () => {
+                    resumeFile.value = null;
+                    if(fileInput.value) fileInput.value.value = '';
+                };
+
+                const loadCompanies = async () => {
+                    try {
+                        const res = await authFetch('/api/companies');
+                        const data = await res.json();
+                        companies.value = data.companies;
+                    } catch(e) { console.error("Failed loading companies", e); }
+                };
+
+                const loadApplications = async () => {
+                    try {
+                        const res = await authFetch('/api/applications');
+                        const data = await res.json();
+                        applications.value = data.applications;
+                        
+                        // Map statuses back to companies list
+                        const appMap = {};
+                        const draftMap = {};
+                        const scheduleMap = {};
+                        for(const a of applications.value) {
+                            appMap[a.company] = a.status;
+                            draftMap[a.company] = a.drafted_email;
+                            scheduleMap[a.company] = a.scheduled_date;
+                        }
+                        for(const c of companies.value) {
+                            if(appMap[c.Name]) {
+                                c.status = appMap[c.Name];
+                                c.drafted_email = draftMap[c.Name];
+                                c.scheduled_date = scheduleMap[c.Name];
+                            }
+                        }
+                    } catch(e) { console.error("Failed loading apps", e); }
+                };
+
+                const selectCompanyForDraft = (company) => {
+                    selectedCompany.value = company;
+                    if (!draftBody.value || confirm("This will discard your current draft. Continue?")) {
+                        draftBody.value = '';
+                        const applicantName = user.value?.name || user.value?.username || '';
+                        emailSubject.value = `Software Engineering Internship Application (May-June 2026) - ${applicantName}`;
+                        currentPage.value = 'draft';
+                    } else {
+                        currentPage.value = 'draft';
+                    }
+                };
+
+                const ignoreCompany = async (company) => {
+                    if(!confirm(`Are you sure you want to ignore ${company.Name}? It will be removed from your list.`)) return;
+                    try {
+                        await authFetch('/api/ignore', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ company_name: company.Name })
+                        });
+                        company.status = 'Ignored'; 
+                        loadApplications(); 
+                    } catch (e) { alert("Failed to ignore"); }
+                };
+
+                const generateInitialDraft = async () => {
+                    drafting.value = true;
+                    try {
+                        const res = await authFetch('/api/draft', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                company_name: selectedCompany.value.Name,
+                                category: selectedCompany.value.Category,
+                                description: selectedCompany.value['Short Description']
+                            })
+                        });
+                        const data = await res.json();
+                        draftBody.value = data.draft;
+                    } catch (e) {
+                        alert("Error drafting email.");
+                    }
+                    drafting.value = false;
+                };
+
+                const refineDraft = async () => {
+                    if(!refinePrompt.value.trim()) return;
+                    refining.value = true;
+                    try {
+                        const res = await authFetch('/api/refine', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                current_draft: draftBody.value,
+                                prompt: refinePrompt.value
+                            })
+                        });
+                        const data = await res.json();
+                        draftBody.value = data.draft;
+                        refinePrompt.value = ''; 
+                    } catch (e) {
+                        alert("Error refining email.");
+                    }
+                    refining.value = false;
+                };
+
+                const sendEmail = async () => {
+                    if (!user.value?.has_app_password) {
+                        alert("Please configure your Google Credentials in Settings first.");
+                        currentPage.value = 'settings';
+                        return;
+                    }
+                    if (!selectedCompany.value.Email || selectedCompany.value.Email.trim() === '-' || selectedCompany.value.Email.trim() === '') {
+                        const newEmail = prompt("This company doesn't have a valid email listed. Please input one manually:");
+                        if(!newEmail || !newEmail.includes("@")) return;
+                        selectedCompany.value.Email = newEmail;
+                    }
+                    
+                    sending.value = true;
+                    try {
+                        const formData = new FormData();
+                        formData.append('company_name', selectedCompany.value.Name);
+                        formData.append('to_email', selectedCompany.value.Email);
+                        formData.append('subject', emailSubject.value);
+                        formData.append('body', draftBody.value);
+                        
+                        const res = await authFetch('/api/send', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (res.ok) {
+                            selectedCompany.value.status = 'Sent';
+                            const currentName = selectedCompany.value.Name;
+                            
+                            draftBody.value = '';
+                            clearFile();
+                            loadApplications();
+                            
+                            const nextCompany = activeCompanies.value.find(c => c.Name !== currentName && (c.status === 'Pending' || !c.status));
+                            
+                            if (nextCompany) {
+                                alert("Application sent! Moving to next company: " + nextCompany.Name);
+                                selectCompanyForDraft(nextCompany);
+                            } else {
+                                alert("Application sent! You've gone through all available companies.");
+                                selectedCompany.value = null;
+                                currentPage.value = 'dashboard';
+                            }
+                        } else {
+                            const err = await res.json();
+                            alert("Failed to send: " + err.detail);
+                        }
+                    } catch (e) {
+                        alert("Failed to send application. Please check your console.");
+                        console.error(e);
+                    }
+                    sending.value = false;
+                };
+
+                // Bulk Mail Logic
+                const bulkCategory = ref('');
+                const bulkSortDirection = ref('asc');
+                const bulkScheduleTime = ref('');
+                
+                const uniqueCategories = computed(() => {
+                    const cats = new Set(companies.value.map(c => c.Category).filter(Boolean));
+                    return Array.from(cats).sort();
+                });
+                
+                const bulkFilteredList = computed(() => {
+                    let list = companies.value.filter(c => c.status !== 'Ignored' && c.status !== 'Sent');
+                    if (bulkCategory.value) {
+                        list = list.filter(c => c.Category === bulkCategory.value);
+                    }
+                    list.sort((a, b) => {
+                        return bulkSortDirection.value === 'asc' 
+                            ? a.Name.localeCompare(b.Name)
+                            : b.Name.localeCompare(a.Name);
+                    });
+                    return list;
+                });
+                
+                const bulkPendingCompanies = computed(() => bulkFilteredList.value.filter(c => c.status === 'Pending' || !c.status));
+                const bulkDraftedCompanies = computed(() => bulkFilteredList.value.filter(c => c.status === 'Drafted'));
+                const scheduledCompanyCount = computed(() => bulkFilteredList.value.filter(c => c.status === 'Scheduled').length);
+                
+                const bulkWorking = ref(false);
+                const bulkWorkingMode = ref(''); // draft | send | schedule
+                const bulkProgress = ref(0);
+                const bulkTotal = ref(0);
+                const bulkWorkingTarget = ref(null);
+                const bulkDelay = ref(30);
+                
+                const viewDraftFromBulk = (c) => {
+                    selectedCompany.value = c;
+                    draftBody.value = c.drafted_email || '';
+                    const applicantName = user.value?.name || user.value?.username || '';
+                    emailSubject.value = `Software Engineering Internship Application (May-June 2026) - ${applicantName}`;
+                    currentPage.value = 'draft';
+                };
+                
+                const addEmail = (c) => {
+                    const newEmail = prompt(`Please enter a valid target email for ${c.Name}:`);
+                    if(newEmail && newEmail.includes('@')) {
+                        c.Email = newEmail;
+                        // Just an optimistic update, it saves when you click Send/Draft
+                    }
+                };
+
+                const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+                const startBulkDraft = async () => {
+                    const targets = bulkPendingCompanies.value;
+                    if(!targets.length) return;
+                    bulkWorking.value = true;
+                    bulkWorkingMode.value = 'draft';
+                    bulkProgress.value = 0;
+                    bulkTotal.value = targets.length;
+                    
+                    for (const c of targets) {
+                        bulkProgress.value++;
+                        bulkWorkingTarget.value = c.Name;
+                        try {
+                            const res = await authFetch('/api/draft', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({
+                                    company_name: c.Name, category: c.Category, description: c['Short Description']
+                                })
+                            });
+                            const data = await res.json();
+                            
+                            c.drafted_email = data.draft; // Update locally
+                            
+                            await authFetch('/api/save_draft', {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json'},
+                                body: JSON.stringify({
+                                    company_name: c.Name,
+                                    email: c.Email && c.Email !== '-' ? c.Email : '',
+                                    drafted_email: data.draft
+                                })
+                            });
+                            c.status = 'Drafted';
+                        } catch (e) {
+                            console.error("Bulk draft error for", c.Name);
+                        }
+                        if(bulkProgress.value < targets.length) await sleep(2000);
+                    }
+                    bulkWorking.value = false;
+                    bulkWorkingTarget.value = null;
+                    loadApplications();
+                };
+
+                const startBulkSendNow = async () => {
+                    if (!user.value?.has_app_password) {
+                        alert("Configure Google Settings first!"); return;
+                    }
+                    const targets = bulkDraftedCompanies.value.filter(c => c.Email && c.Email.includes('@'));
+                    if(!targets.length) { alert("No valid drafted companies (with emails) to send."); return; }
+                    
+                    bulkWorking.value = true;
+                    bulkWorkingMode.value = 'send';
+                    bulkProgress.value = 0;
+                    bulkTotal.value = targets.length;
+                    
+                    for(const c of targets) {
+                        bulkProgress.value++;
+                        bulkWorkingTarget.value = c.Name;
+                        try {
+                            const formData = new FormData();
+                            formData.append('company_name', c.Name);
+                            formData.append('to_email', c.Email);
+                            
+                            const applicantName = user.value?.name || user.value?.username || '';
+                            formData.append('subject', `Software Engineering Internship Application (May-June 2026) - ${applicantName}`);
+                            
+                            formData.append('body', c.drafted_email || '');
+                            
+                            const res = await authFetch('/api/send', { method: 'POST', body: formData });
+                            if (res.ok) c.status = 'Sent';
+                        } catch(e) { }
+                        if(bulkProgress.value < targets.length) await sleep(bulkDelay.value * 1000);
+                    }
+                    bulkWorking.value = false;
+                    bulkWorkingTarget.value = null;
+                    loadApplications();
+                };
+
+                const scheduleBulkDrafts = async () => {
+                    const targets = bulkDraftedCompanies.value.map(c => c.Name);
+                    if(!targets.length) return;
+                    
+                    // Convert local time to UTC for backend
+                    const scheduleDateUTC = new Date(bulkScheduleTime.value).toISOString();
+                    
+                    try {
+                        const res = await authFetch('/api/schedule', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ company_names: targets, scheduled_date: scheduleDateUTC })
+                        });
+                        if (res.ok) {
+                            alert("Drafts scheduled successfully!");
+                            loadApplications();
+                        }
+                    } catch(e) {
+                        alert("Scheduling failed.");
+                    }
+                };
+
+                onMounted(() => {
+                    fetchUser();
+                });
+
+                return {
+                    initialLoading, isAuthenticated,
+                    isRegistering, toggleAuthMode, authLoading, authError, authForm, handleAuth, user, logout,
+                    popularSkills, authResumeFile, handleAuthFileUpload,
+                    
+                    currentPage,
+                    companies, applications, activeCompanies, filteredCompanies, searchQuery,
+                    selectedCompany, selectCompanyForDraft, ignoreCompany,
+                    drafting, refining, draftBody, generateInitialDraft, refineDraft, refinePrompt, emailSubject,
+                    
+                    settingsForm, saveSettings, savingSettings, saveSuccessMsg, showPassword,
+                    
+                    sendEmail, sending,
+                    loadApplications,
+                    fileInput, resumeFile, handleFileUpload, clearFile,
+                    
+                    bulkCategory, bulkSortDirection, bulkScheduleTime, uniqueCategories,
+                    bulkFilteredList, bulkPendingCompanies, bulkDraftedCompanies, scheduledCompanyCount,
+                    bulkWorking, bulkWorkingMode, bulkProgress, bulkTotal, bulkWorkingTarget,
+                    startBulkDraft, startBulkSendNow, scheduleBulkDrafts,
+                    bulkDelay, viewDraftFromBulk, addEmail
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
