@@ -28,6 +28,7 @@ app.add_middleware(
 )
 
 DB_FILE = "applications.db"
+UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -126,9 +127,9 @@ def register(
         raise HTTPException(status_code=400, detail="Username already exists")
     
     # Save the resume
-    os.makedirs("uploads", exist_ok=True)
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
     file_extension = os.path.splitext(resume.filename)[1]
-    safe_resume_path = f"uploads/{username}_resume{file_extension}"
+    safe_resume_path = os.path.join(UPLOADS_DIR, f"{username}_resume{file_extension}")
     with open(safe_resume_path, "wb") as buffer:
         shutil.copyfileobj(resume.file, buffer)
         
@@ -165,7 +166,7 @@ def login(req: AuthRequest):
 def get_me(user_id: int = Depends(get_current_user)):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT username, google_email, google_app_password, name FROM users WHERE id = ?", (user_id,))
+    c.execute("SELECT username, google_email, google_app_password, name, github, linkedin, skills, resume_filename FROM users WHERE id = ?", (user_id,))
     row = c.fetchone()
     conn.close()
     if not row:
@@ -175,19 +176,64 @@ def get_me(user_id: int = Depends(get_current_user)):
         "username": row[0],
         "google_email": row[1] or "",
         "has_app_password": bool(row[2]),
-        "name": row[3] or ""
+        "name": row[3] or "",
+        "github": row[4] or "",
+        "linkedin": row[5] or "",
+        "skills": row[6] or "",
+        "resume_filename": row[7] or ""
     }
 
-class SettingsRequest(BaseModel):
-    google_email: str
-    google_app_password: str
+from typing import Optional
 
-@app.post("/api/settings")
-def update_settings(req: SettingsRequest, user_id: int = Depends(get_current_user)):
+@app.put("/api/settings")
+def update_settings(
+    user_id: int = Depends(get_current_user),
+    name: str = Form(""),
+    github: str = Form(""),
+    linkedin: str = Form(""),
+    skills: str = Form(""),
+    google_email: str = Form(""),
+    google_app_password: str = Form(""),
+    resume: Optional[UploadFile] = File(None)
+):
+    import shutil
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("UPDATE users SET google_email = ?, google_app_password = ? WHERE id = ?", 
-              (req.google_email, req.google_app_password, user_id))
+    
+    c.execute("SELECT username, resume_path FROM users WHERE id = ?", (user_id,))
+    user_row = c.fetchone()
+    if not user_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    username, old_resume_path = user_row[0], user_row[1]
+    
+    query = "UPDATE users SET name = ?, github = ?, linkedin = ?, skills = ?, google_email = ?"
+    params = [name, github, linkedin, skills, google_email]
+    
+    if google_app_password:
+        # Avoid overriding with empty string if not provided
+        query += ", google_app_password = ?"
+        params.append(google_app_password)
+        
+    if resume and resume.filename:
+        os.makedirs(UPLOADS_DIR, exist_ok=True)
+        file_extension = os.path.splitext(resume.filename)[1]
+        safe_resume_path = os.path.join(UPLOADS_DIR, f"{username}_resume{file_extension}")
+        with open(safe_resume_path, "wb") as buffer:
+            shutil.copyfileobj(resume.file, buffer)
+        query += ", resume_path = ?, resume_filename = ?"
+        params.extend([safe_resume_path, resume.filename])
+
+        if old_resume_path and old_resume_path != safe_resume_path and os.path.exists(old_resume_path):
+            try:
+                os.remove(old_resume_path)
+            except Exception:
+                pass
+        
+    query += " WHERE id = ?"
+    params.append(user_id)
+    
+    c.execute(query, tuple(params))
     conn.commit()
     conn.close()
     return {"status": "success"}
@@ -370,15 +416,18 @@ def send_email(
         msg['From'] = google_email
         msg['To'] = to_email
 
-        if resume_path and os.path.exists(resume_path):
-            with open(resume_path, "rb") as f:
-                resume_data = f.read()
-            msg.add_attachment(
-                resume_data,
-                maintype='application',
-                subtype='octet-stream',
-                filename=resume_filename or "resume.pdf"
-            )
+        if not resume_path or not os.path.exists(resume_path):
+            conn.close()
+            raise HTTPException(status_code=400, detail="Resume not found. Please re-upload your resume in Settings.")
+
+        with open(resume_path, "rb") as f:
+            resume_data = f.read()
+        msg.add_attachment(
+            resume_data,
+            maintype='application',
+            subtype='octet-stream',
+            filename=resume_filename or "resume.pdf"
+        )
 
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(google_email, google_app_password)
@@ -424,6 +473,10 @@ async def mail_scheduler_loop():
             for row in rows:
                 app_id, c_name, to_email, body, u_id, g_email, g_pwd, r_path, r_name, u_name, u_username = row
                 if to_email and g_email and g_pwd:
+                    if not r_path or not os.path.exists(r_path):
+                        print(f"Scheduler skipped {c_name}: missing resume for user {u_id}")
+                        continue
+
                     msg = EmailMessage()
                     msg.set_content(body)
                     applicant_name = u_name or u_username
@@ -431,10 +484,9 @@ async def mail_scheduler_loop():
                     msg['From'] = g_email
                     msg['To'] = to_email
 
-                    if r_path and os.path.exists(r_path):
-                        with open(r_path, "rb") as f:
-                            r_data = f.read()
-                        msg.add_attachment(r_data, maintype='application', subtype='octet-stream', filename=r_name or "resume.pdf")
+                    with open(r_path, "rb") as f:
+                        r_data = f.read()
+                    msg.add_attachment(r_data, maintype='application', subtype='octet-stream', filename=r_name or "resume.pdf")
 
                     server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
                     server.login(g_email, g_pwd)

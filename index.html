@@ -419,7 +419,7 @@
                                 </button>
                                 <div class="text-xs text-gray-500 flex items-center gap-1 border border-gray-300 rounded px-2 bg-gray-50 h-[36px]">
                                     <span>Delay (s):</span>
-                                    <input type="number" v-model="bulkDelay" class="bg-transparent w-10 text-center font-bold outline-none" min="1">
+                                    <span class="font-bold">35</span>
                                 </div>
                             </div>
                             <div class="flex gap-2">
@@ -485,14 +485,41 @@
                 </div>
 
                 <!-- Settings Page -->
-                <div v-else-if="currentPage === 'settings'" class="max-w-2xl mx-auto mt-8">
+                <div v-else-if="currentPage === 'settings'" class="max-w-2xl mx-auto mt-8 pb-10">
                     <div class="mb-8">
                         <h2 class="text-3xl font-bold text-gray-900">Settings</h2>
-                        <p class="text-gray-500 mt-1">Configure your Google Workspace credentials to send emails directly.</p>
+                        <p class="text-gray-500 mt-1">Configure your profile and Google Workspace credentials.</p>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 space-y-6 mb-8">
+                        <h3 class="text-xl font-bold border-b pb-2">Profile Information</h3>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Full Name</label>
+                            <input v-model="settingsForm.name" type="text" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <label class="block text-sm font-bold text-gray-700 mb-2">GitHub URL</label>
+                                <input v-model="settingsForm.github" type="url" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-sm font-bold text-gray-700 mb-2">LinkedIn URL</label>
+                                <input v-model="settingsForm.linkedin" type="url" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Skills (comma separated)</label>
+                            <textarea v-model="settingsForm.skills" rows="2" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Resume</label>
+                            <p v-if="user && user.resume_filename" class="text-sm text-gray-500 mb-2">Current file: {{ user.resume_filename }}</p>
+                            <input type="file" ref="settingsFileInput" @change="handleSettingsFileUpload" accept=".pdf,.doc,.docx" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        </div>
                     </div>
 
                     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 space-y-6">
-                        
+                        <h3 class="text-xl font-bold border-b pb-2">Email Configuration</h3>
                         <div class="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800 mb-6 flex gap-3">
                             <i class="fa-solid fa-circle-info text-blue-500 mt-0.5"></i>
                             <div>
@@ -505,12 +532,12 @@
                         </div>
 
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-2">Google Email Address <span class="text-red-500">*</span></label>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Google Email Address</label>
                             <input v-model="settingsForm.googleEmail" type="email" placeholder="student@gmail.com" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-2">16-Digit App Password <span class="text-red-500">*</span></label>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">16-Digit App Password</label>
                             <div class="relative">
                                 <input :type="showPassword ? 'text' : 'password'" v-model="settingsForm.googleAppPassword" placeholder="abcd efgh ijkl mnop" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono">
                                 <button @click="showPassword = !showPassword" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
@@ -536,10 +563,21 @@
     <script>
         const { createApp, ref, computed, onMounted } = Vue;
 
-        // Explicitly set the backend API URL for GitHub Pages deployment.
-        // Replace 'YOUR_BACKEND_URL_HERE' with your actual Hugging Face Space URL 
-        // Example: 'https://username-spacename.hf.space'
-        const API_BASE = 'https://0xmathew-interntracker.hf.space';
+        // Backend URL resolution:
+        // 1) window.APP_CONFIG.API_BASE_URL (if injected)
+        // 2) localStorage.API_BASE_URL
+        // 3) localhost fallback for dev
+        // 4) production fallback (set this to your deployed backend)
+        const API_BASE = (() => {
+            const configured = window.APP_CONFIG?.API_BASE_URL || localStorage.getItem('API_BASE_URL');
+            if (configured && configured.trim()) return configured.replace(/\/$/, '');
+
+            const host = window.location.hostname;
+            if (host === 'localhost' || host === '127.0.0.1') return 'http://127.0.0.1:8000';
+
+            // TODO: Replace with your actual backend URL before deploy.
+            return 'https://your-backend-space.hf.space';
+        })();
 
         createApp({
             setup() {
@@ -594,7 +632,18 @@
                 const fileInput = ref(null);
                 const resumeFile = ref(null);
 
-                const settingsForm = ref({ googleEmail: '', googleAppPassword: '' });
+                const settingsForm = ref({ name: '', github: '', linkedin: '', skills: '', googleEmail: '', googleAppPassword: '' });
+                const settingsFileInput = ref(null);
+                const settingsResumeFile = ref(null);
+
+                const handleSettingsFileUpload = (e) => {
+                    if (e.target.files.length > 0) {
+                        settingsResumeFile.value = e.target.files[0];
+                    } else {
+                        settingsResumeFile.value = null;
+                    }
+                };
+
                 const showPassword = ref(false);
                 const sending = ref(false);
                 const savingSettings = ref(false);
@@ -694,6 +743,10 @@
                         isAuthenticated.value = true;
                         
                         // Prep settings form
+                        settingsForm.value.name = data.name || '';
+                        settingsForm.value.github = data.github || '';
+                        settingsForm.value.linkedin = data.linkedin || '';
+                        settingsForm.value.skills = data.skills || '';
                         settingsForm.value.googleEmail = data.google_email || '';
                         
                         // Load Dashboard Data
@@ -716,17 +769,32 @@
                 const saveSettings = async () => {
                     savingSettings.value = true;
                     try {
+                        const formData = new FormData();
+                        formData.append('name', settingsForm.value.name);
+                        formData.append('github', settingsForm.value.github);
+                        formData.append('linkedin', settingsForm.value.linkedin);
+                        formData.append('skills', settingsForm.value.skills);
+                        formData.append('google_email', settingsForm.value.googleEmail);
+                        formData.append('google_app_password', settingsForm.value.googleAppPassword);
+                        
+                        if (settingsResumeFile.value) {
+                            formData.append('resume', settingsResumeFile.value);
+                        }
+
                         const res = await authFetch('/api/settings', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                google_email: settingsForm.value.googleEmail,
-                                google_app_password: settingsForm.value.googleAppPassword
-                            })
+                            method: 'PUT',
+                            body: formData
                         });
+                        
                         if (res.ok) {
                             saveSuccessMsg.value = true;
-                            if(user.value) user.value.has_app_password = true; // Optimistic update
+                            if(user.value) {
+                                user.value.has_app_password = !!settingsForm.value.googleAppPassword || user.value.has_app_password;
+                                user.value.name = settingsForm.value.name;
+                                user.value.resume_filename = settingsResumeFile.value ? settingsResumeFile.value.name : user.value.resume_filename;
+                            }
+                            if(settingsFileInput.value) settingsFileInput.value.value = '';
+                            settingsResumeFile.value = null;
                             setTimeout(() => saveSuccessMsg.value = false, 3000);
                         } else {
                             alert("Failed to save settings");
@@ -933,7 +1001,7 @@
                 const bulkProgress = ref(0);
                 const bulkTotal = ref(0);
                 const bulkWorkingTarget = ref(null);
-                const bulkDelay = ref(30);
+                const bulkDelay = ref(35);
                 
                 const viewDraftFromBulk = (c) => {
                     selectedCompany.value = c;
@@ -1024,7 +1092,7 @@
                             const res = await authFetch('/api/send', { method: 'POST', body: formData });
                             if (res.ok) c.status = 'Sent';
                         } catch(e) { }
-                        if(bulkProgress.value < targets.length) await sleep(bulkDelay.value * 1000);
+                        if(bulkProgress.value < targets.length) await sleep(35000);
                     }
                     bulkWorking.value = false;
                     bulkWorkingTarget.value = null;
@@ -1068,6 +1136,7 @@
                     drafting, refining, draftBody, generateInitialDraft, refineDraft, refinePrompt, emailSubject,
                     
                     settingsForm, saveSettings, savingSettings, saveSuccessMsg, showPassword,
+                    settingsFileInput, handleSettingsFileUpload,
                     
                     sendEmail, sending,
                     loadApplications,
