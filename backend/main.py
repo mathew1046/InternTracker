@@ -4,6 +4,7 @@ import pandas as pd
 import hashlib
 import secrets
 import asyncio
+import glob
 from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Body, File, UploadFile, Form, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,6 +30,36 @@ app.add_middleware(
 
 DB_FILE = "applications.db"
 UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+
+
+def resolve_resume_path(stored_path: str | None, username: str | None, resume_filename: str | None):
+    candidates = []
+
+    if stored_path:
+        candidates.append(stored_path)
+        if not os.path.isabs(stored_path):
+            candidates.append(os.path.join(os.path.dirname(__file__), stored_path))
+        candidates.append(os.path.join(UPLOADS_DIR, os.path.basename(stored_path)))
+
+    if username and resume_filename:
+        ext = os.path.splitext(resume_filename)[1]
+        if ext:
+            candidates.append(os.path.join(UPLOADS_DIR, f"{username}_resume{ext}"))
+
+    if username:
+        candidates.extend(sorted(glob.glob(os.path.join(UPLOADS_DIR, f"{username}_resume.*"))))
+
+    seen = set()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        normalized = os.path.abspath(candidate)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        if os.path.exists(normalized):
+            return normalized
+    return None
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -393,58 +424,89 @@ def schedule_drafts(req: ScheduleRequest, user_id: int = Depends(get_current_use
 
 @app.post("/api/send")
 def send_email(
-    company_name: str = Form(...),
-    to_email: str = Form(...),
-    subject: str = Form(...),
-    body: str = Form(...),
+    company_name: Optional[str] = Form(None),
+    company: Optional[str] = Form(None),
+    to_email: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    subject: Optional[str] = Form(None),
+    body: Optional[str] = Form(None),
+    resume: Optional[UploadFile] = File(None),
     user_id: int = Depends(get_current_user)
 ):
     try:
+        final_company_name = (company_name or company or "").strip()
+        final_to_email = (to_email or email or "").strip()
+        final_subject = (subject or "").strip()
+        final_body = (body or "").strip()
+
+        if not final_company_name or not final_to_email or not final_subject or not final_body:
+            raise HTTPException(
+                status_code=400,
+                detail="Missing required fields. Required: company_name/company, to_email/email, subject, body"
+            )
+
         # Fetch user's stored Google credentials and resume details
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
-        c.execute("SELECT google_email, google_app_password, resume_path, resume_filename FROM users WHERE id = ?", (user_id,))
+        c.execute("SELECT username, google_email, google_app_password, resume_path, resume_filename FROM users WHERE id = ?", (user_id,))
         row = c.fetchone()
-        if not row or not row[0] or not row[1]:
+        if not row or not row[1] or not row[2]:
             conn.close()
             raise HTTPException(status_code=400, detail="Google credentials not configured in settings.")
-        google_email, google_app_password, resume_path, resume_filename = row[0], row[1], row[2], row[3]
+        username, google_email, google_app_password, resume_path, resume_filename = row[0], row[1], row[2], row[3], row[4]
+
+        if resume and resume.filename:
+            os.makedirs(UPLOADS_DIR, exist_ok=True)
+            file_extension = os.path.splitext(resume.filename)[1]
+            resolved_resume_path = os.path.join(UPLOADS_DIR, f"{username}_resume{file_extension}")
+            with open(resolved_resume_path, "wb") as buffer:
+                import shutil
+                shutil.copyfileobj(resume.file, buffer)
+            c.execute("UPDATE users SET resume_path = ?, resume_filename = ? WHERE id = ?", (resolved_resume_path, resume.filename, user_id))
+            conn.commit()
+            resume_path = resolved_resume_path
+            resume_filename = resume.filename
+
+        resolved_resume_path = resolve_resume_path(resume_path, username, resume_filename)
         
         msg = EmailMessage()
-        msg.set_content(body)
-        msg['Subject'] = subject
+        msg.set_content(final_body)
+        msg['Subject'] = final_subject
         msg['From'] = google_email
-        msg['To'] = to_email
+        msg['To'] = final_to_email
 
-        if not resume_path or not os.path.exists(resume_path):
-            conn.close()
-            raise HTTPException(status_code=400, detail="Resume not found. Please re-upload your resume in Settings.")
+        if resolved_resume_path:
+            if resolved_resume_path != resume_path:
+                c.execute("UPDATE users SET resume_path = ? WHERE id = ?", (resolved_resume_path, user_id))
+                conn.commit()
 
-        with open(resume_path, "rb") as f:
-            resume_data = f.read()
-        msg.add_attachment(
-            resume_data,
-            maintype='application',
-            subtype='octet-stream',
-            filename=resume_filename or "resume.pdf"
-        )
+            with open(resolved_resume_path, "rb") as f:
+                resume_data = f.read()
+            msg.add_attachment(
+                resume_data,
+                maintype='application',
+                subtype='octet-stream',
+                filename=resume_filename or "resume.pdf"
+            )
 
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(google_email, google_app_password)
         server.send_message(msg)
         server.quit()
 
-        c.execute("SELECT id FROM applications WHERE company_name = ? AND user_id = ?", (company_name, user_id))
+        c.execute("SELECT id FROM applications WHERE company_name = ? AND user_id = ?", (final_company_name, user_id))
         row_exists = c.fetchone()
         if row_exists:
-            c.execute("UPDATE applications SET status='Sent', email=?, drafted_email=?, sent_date=CURRENT_TIMESTAMP WHERE id=?", (to_email, body, row_exists[0]))
+            c.execute("UPDATE applications SET status='Sent', email=?, drafted_email=?, sent_date=CURRENT_TIMESTAMP WHERE id=?", (final_to_email, final_body, row_exists[0]))
         else:
             c.execute("INSERT INTO applications (company_name, email, status, drafted_email, user_id) VALUES (?, ?, 'Sent', ?, ?)",
-                      (company_name, to_email, body, user_id))
+                      (final_company_name, final_to_email, final_body, user_id))
         conn.commit()
         conn.close()
 
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -473,9 +535,7 @@ async def mail_scheduler_loop():
             for row in rows:
                 app_id, c_name, to_email, body, u_id, g_email, g_pwd, r_path, r_name, u_name, u_username = row
                 if to_email and g_email and g_pwd:
-                    if not r_path or not os.path.exists(r_path):
-                        print(f"Scheduler skipped {c_name}: missing resume for user {u_id}")
-                        continue
+                    resolved_resume_path = resolve_resume_path(r_path, u_username, r_name)
 
                     msg = EmailMessage()
                     msg.set_content(body)
@@ -484,9 +544,13 @@ async def mail_scheduler_loop():
                     msg['From'] = g_email
                     msg['To'] = to_email
 
-                    with open(r_path, "rb") as f:
-                        r_data = f.read()
-                    msg.add_attachment(r_data, maintype='application', subtype='octet-stream', filename=r_name or "resume.pdf")
+                    if resolved_resume_path:
+                        with open(resolved_resume_path, "rb") as f:
+                            r_data = f.read()
+                        msg.add_attachment(r_data, maintype='application', subtype='octet-stream', filename=r_name or "resume.pdf")
+
+                        if resolved_resume_path != r_path:
+                            c.execute("UPDATE users SET resume_path = ? WHERE id = ?", (resolved_resume_path, u_id))
 
                     server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
                     server.login(g_email, g_pwd)
