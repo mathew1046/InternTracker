@@ -316,12 +316,11 @@ def draft_email(req: EmailDraftRequest, user_id: int = Depends(get_current_user)
         skills = user_data[3] if user_data and user_data[3] else ""
 
         prompt = f"""
-        Draft a professional cold email for an internship at a company.
+        Draft a professional cold email for a marketing/digital marketing internship at a company.
         
         My Profile:
         Name: {user_name}
         Skills: {skills}
-        GitHub: {github}
         LinkedIn: {linkedin}
 
         Company Profile:
@@ -331,10 +330,11 @@ def draft_email(req: EmailDraftRequest, user_id: int = Depends(get_current_user)
         
         Requirements:
         The mail should sound human and not generic.
-        Make it concise and politely request an internship opportunity.
-        Highlight how my specific skills ({skills}) align with the company profile, but keep it short and concise.
-        Include my GitHub and LinkedIn links naturally if provided.
-        Start the mail with a polite greeting and introduce myself(2nd Year B.Tech Student).
+        Make it concise and politely request a marketing/digital marketing internship opportunity.
+        Highlight how my specific skills ({skills}) align with the company's marketing, branding, content creation, or digital growth needs, but keep it short and concise.
+        If the company is in a non-marketing industry, emphasize transferable skills like content strategy, social media management, brand communication, SEO/SEM, or campaign analytics.
+        Include my LinkedIn link naturally if provided.
+        Start the mail with a polite greeting and introduce myself briefly as a student passionate about marketing/digital marketing.
         DONOT ASSUME ANYTHING.
         DO NOT use any placeholders like [Your Name], [Company Name], [Link], etc. Fully populate the email using the exact details provided.
         Return ONLY the raw email body text. Do not include a Subject line. Do not use markdown formatting wrappers (no ```) and no conversational filler.
@@ -355,7 +355,7 @@ class EditDraftRequest(BaseModel):
 def refine_draft(req: EditDraftRequest, user_id: int = Depends(get_current_user)):
     try:
         sys_prompt = f"""
-        You are an AI assistant helping a student refine their cold email for an internship.
+        You are an AI assistant helping a student refine their cold email for a marketing/digital marketing internship.
         Here is the current draft:
         \"\"\"
         {req.current_draft}
@@ -363,7 +363,7 @@ def refine_draft(req: EditDraftRequest, user_id: int = Depends(get_current_user)
         The user wants you to modify the draft based on the following instruction:
         {req.prompt}
         
-        Keep it professional, polite, and concise. Return ONLY the fully revised email body text without markdown formatting wrappers or extra conversational text.
+        Keep it professional, polite, and concise. Maintain focus on marketing/digital marketing skills and how they benefit the company. Return ONLY the fully revised email body text without markdown formatting wrappers or extra conversational text.
         """
         response = client.models.generate_content(
             model='gemma-3-27b-it',
@@ -540,7 +540,7 @@ async def mail_scheduler_loop():
                     msg = EmailMessage()
                     msg.set_content(body)
                     applicant_name = u_name or u_username
-                    msg['Subject'] = f"Software Engineering Internship Application (May-June 2026) - {applicant_name}"
+                    msg['Subject'] = f"Marketing Internship Application (May-June 2026) - {applicant_name}"
                     msg['From'] = g_email
                     msg['To'] = to_email
 

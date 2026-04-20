@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Internship Application Tracker</title>
+    <title>Marketing Internship Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <!-- Icons -->
@@ -22,7 +22,7 @@
             <div class="bg-white p-8 rounded-xl shadow-lg max-w-md w-full border border-gray-200 m-auto mt-4 mb-4">
                 <div class="text-center mb-6">
                     <i class="fa-solid fa-rocket text-blue-600 text-3xl mb-2"></i>
-                    <h2 class="text-2xl font-bold">InternTracker</h2>
+                    <h2 class="text-2xl font-bold">Marketing InternTracker</h2>
                     <p class="text-sm text-gray-500 mt-1">{{ isRegistering ? 'Create your profile' : 'Sign in to continue' }}</p>
                 </div>
                 
@@ -45,8 +45,8 @@
                         </div>
                         <div class="flex gap-4">
                             <div class="flex-1">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">GitHub (optional)</label>
-                                <input v-model="authForm.github" type="text" placeholder="github.com/..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+<label class="block text-sm font-medium text-gray-700 mb-1">Portfolio/Website (optional)</label>
+                                <input v-model="authForm.github" type="text" placeholder="yoursite.com/..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm">
                             </div>
                             <div class="flex-1">
                                 <label class="block text-sm font-medium text-gray-700 mb-1">LinkedIn (optional)</label>
@@ -92,7 +92,7 @@
         <div v-if="isAuthenticated" class="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm flex-shrink-0">
             <div class="p-6 border-b border-gray-100 flex items-center gap-3">
                 <i class="fa-solid fa-rocket text-blue-600 text-xl"></i>
-                <h1 class="text-xl font-bold font-heading">InternTracker</h1>
+                <h1 class="text-xl font-bold font-heading">Marketing InternTracker</h1>
             </div>
             
             <div class="px-6 py-3 border-b border-gray-50 flex items-center justify-between bg-blue-50/50">
@@ -149,7 +149,7 @@
                     <div class="flex justify-between items-end mb-8">
                         <div>
                             <h2 class="text-3xl font-bold text-gray-900">Dashboard</h2>
-                            <p class="text-gray-500 mt-1">Track your internship applications.</p>
+                            <p class="text-gray-500 mt-1">Track your marketing internship applications.</p>
                         </div>
                         <button @click="loadApplications" class="bg-white border shadow-sm px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 flex items-center gap-2 transition">
                             <i class="fa-solid fa-rotate-right"></i> Refresh
@@ -270,7 +270,7 @@
                             <i class="fa-solid fa-envelope-open"></i>
                         </div>
                         <h3 class="text-xl font-bold text-gray-700 mb-2">No Company Selected</h3>
-                        <p class="text-gray-500 mb-6 max-w-md">Go to the companies page to select a company and start writing your cold email.</p>
+                        <p class="text-gray-500 mb-6 max-w-md">Go to the companies page to select a company and start writing your marketing outreach email.</p>
                         <button @click="currentPage = 'companies'" class="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 transition font-medium">Browse Companies</button>
                     </div>
 
@@ -351,7 +351,7 @@
                             <button v-if="!draftBody" @click="generateInitialDraft" class="bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl p-4 shadow text-left hover:shadow-md transition group overflow-hidden relative">
                                 <div class="absolute inset-0 bg-white/20 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition duration-500 ease-in-out"></div>
                                 <div class="font-bold flex items-center gap-2 mb-1"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Draft Email</div>
-                                <div class="text-xs text-purple-100">Let Gemini AI write a personalized cold email.</div>
+                                <div class="text-xs text-purple-100">Let Gemini AI write a personalized marketing internship email.</div>
                             </button>
 
                             <!-- AI Assistant / Refiner -->
@@ -359,7 +359,7 @@
                                 <div class="font-bold flex items-center gap-2 mb-4 text-purple-700">
                                     <i class="fa-solid fa-wand-magic-sparkles"></i> AI Refiner
                                 </div>
-                                <p class="text-xs text-gray-500 mb-3">Ask AI to modify the current text (e.g. "make it more formal", "make it shorter", "mention my python skills")</p>
+                                <p class="text-xs text-gray-500 mb-3">Ask AI to modify the current text (e.g. "make it more formal", "make it shorter", "emphasize my marketing skills")</p>
                                 
                                 <textarea v-model="refinePrompt" class="w-full border border-gray-300 rounded-lg p-3 text-sm mb-3 resize-none h-24 focus:ring-2 focus:ring-purple-500 focus:border-purple-500" placeholder="E.g., Make it sound more enthusiastic and shorter..."></textarea>
                                 
@@ -499,7 +499,7 @@
                         </div>
                         <div class="flex gap-4">
                             <div class="flex-1">
-                                <label class="block text-sm font-bold text-gray-700 mb-2">GitHub URL</label>
+<label class="block text-sm font-bold text-gray-700 mb-2">Portfolio/Website URL</label>
                                 <input v-model="settingsForm.github" type="url" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
                             </div>
                             <div class="flex-1">
@@ -573,10 +573,12 @@
             if (configured && configured.trim()) return configured.replace(/\/$/, '');
 
             const host = window.location.hostname;
-            if (host === 'localhost' || host === '127.0.0.1') return 'http://127.0.0.1:8000';
+            if (host === 'localhost' || host === '127.0.0.1') {
+                if (window.location.port === '3000') return '';
+                return 'http://127.0.0.1:8000';
+            }
 
-            // TODO: Replace with your actual backend URL before deploy.
-            return 'https://0xmathew-.hf.space';
+            return '';
         })();
 
         createApp({
@@ -590,7 +592,7 @@
                 const user = ref(null);
                 const token = ref(localStorage.getItem('token') || null);
 
-                const popularSkills = ['Python', 'JavaScript', 'TypeScript', 'React', 'Vue', 'Node.js', 'Java', 'C++', 'Go', 'Ruby', 'SQL', 'MongoDB', 'PostgreSQL', 'AWS', 'Docker', 'Kubernetes', 'Git', 'Machine Learning', 'Data Analysis', 'HTML/CSS'];
+                const popularSkills = ['Content Writing', 'Social Media Marketing', 'SEO/SEM', 'Google Analytics', 'Canva', 'Adobe Creative Suite', 'Email Marketing', 'Copywriting', 'Brand Strategy', 'Market Research', 'Facebook Ads', 'Google Ads', 'Instagram Marketing', 'LinkedIn Marketing', 'Video Editing', 'Photography', 'WordPress', 'Mailchimp', 'Hootsuite', 'HTML/CSS'];
                 const authForm = ref({ username: '', password: '', name: '', github: '', linkedin: '', skills: [] });
                 const authResumeFile = ref(null);
                 
@@ -626,7 +628,7 @@
                 const drafting = ref(false);
                 const refining = ref(false);
                 const draftBody = ref('');
-                const emailSubject = ref('Application for Internship');
+                const emailSubject = ref('Application for Marketing Internship');
                 const refinePrompt = ref('');
                 
                 const fileInput = ref(null);
@@ -851,11 +853,11 @@
 
                 const selectCompanyForDraft = (company) => {
                     selectedCompany.value = company;
-                    if (!draftBody.value || confirm("This will discard your current draft. Continue?")) {
-                        draftBody.value = '';
-                        const applicantName = user.value?.name || user.value?.username || '';
-                        emailSubject.value = `Software Engineering Internship Application (May-June 2026) - ${applicantName}`;
-                        currentPage.value = 'draft';
+if (!draftBody.value || confirm("This will discard your current draft. Continue?")) {
+                         draftBody.value = '';
+                         const applicantName = user.value?.name || user.value?.username || '';
+                         emailSubject.value = `Marketing Internship Application (May-June 2026) - ${applicantName}`;
+                         currentPage.value = 'draft';
                     } else {
                         currentPage.value = 'draft';
                     }
@@ -1007,7 +1009,7 @@
                     selectedCompany.value = c;
                     draftBody.value = c.drafted_email || '';
                     const applicantName = user.value?.name || user.value?.username || '';
-                    emailSubject.value = `Software Engineering Internship Application (May-June 2026) - ${applicantName}`;
+                    emailSubject.value = `Marketing Internship Application (May-June 2026) - ${applicantName}`;
                     currentPage.value = 'draft';
                 };
                 
@@ -1085,7 +1087,7 @@
                             formData.append('to_email', c.Email);
                             
                             const applicantName = user.value?.name || user.value?.username || '';
-                            formData.append('subject', `Software Engineering Internship Application (May-June 2026) - ${applicantName}`);
+                            formData.append('subject', `Marketing Internship Application (May-June 2026) - ${applicantName}`);
                             
                             formData.append('body', c.drafted_email || '');
                             

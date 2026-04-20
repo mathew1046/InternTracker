@@ -2,21 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Ensure non-root user for Hugging Face Spaces
-RUN useradd -m -u 1000 user
-USER user
-
-ENV PATH="/home/user/.local/bin:\$PATH"
-
-COPY --chown=user requirements.txt .
+COPY ./backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create necessary directories
-RUN mkdir -p /app/backend /app/data /app/backend/uploads
-RUN chown -R user:user /app
+COPY backend/ ./backend/
+COPY data/ ./data/
 
-COPY --chown=user . /app/backend/
-COPY --chown=user ../data/ /app/data/
+RUN mkdir -p /app/backend/uploads
 
-# Run the FastAPI server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+WORKDIR /app/backend
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
