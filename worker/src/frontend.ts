@@ -1,3 +1,5 @@
+// Auto-generated from frontend/index.html
+export const FRONTEND_HTML = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -406,7 +408,7 @@
                             <p class="text-xs text-gray-500 mb-3">AI will auto-generate email contents for all pending companies. (2s delay each)</p>
                             <button @click="startBulkDraft" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded shadow-sm text-sm disabled:opacity-50" :disabled="bulkWorking || bulkPendingCompanies.length === 0">
                                 <i v-if="bulkWorkingMode === 'draft'" class="fa-solid fa-spinner fa-spin mr-1"></i>
-                                {{ bulkWorkingMode === 'draft' ? `Drafting... (${bulkProgress}/${bulkTotal})` : `Generate ${bulkPendingCompanies.length} Drafts` }}
+                                {{ bulkWorkingMode === 'draft' ? \`Drafting... (\${bulkProgress}/\${bulkTotal})\` : \`Generate \${bulkPendingCompanies.length} Drafts\` }}
                             </button>
                         </div>
 
@@ -415,7 +417,7 @@
                             <div class="flex gap-2 mb-3 items-center">
                                 <button @click="startBulkSendNow" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded shadow-sm text-sm disabled:opacity-50" :disabled="bulkWorking || bulkDraftedCompanies.length === 0">
                                     <i v-if="bulkWorkingMode === 'send'" class="fa-solid fa-spinner fa-spin mr-1"></i> 
-                                    {{ bulkWorkingMode === 'send' ? `Sending... (${bulkProgress}/${bulkTotal})` : 'Send Now' }}
+                                    {{ bulkWorkingMode === 'send' ? \`Sending... (\${bulkProgress}/\${bulkTotal})\` : 'Send Now' }}
                                 </button>
                                 <div class="text-xs text-gray-500 flex items-center gap-1 border border-gray-300 rounded px-2 bg-gray-50 h-[36px]">
                                     <span>Delay (s):</span>
@@ -576,7 +578,7 @@
         // 4) production fallback (set this to your deployed backend)
 const API_BASE = (() => {
             const configured = window.APP_CONFIG?.API_BASE_URL || localStorage.getItem('API_BASE_URL');
-            if (configured && configured.trim()) return configured.replace(/\/$/, '');
+            if (configured && configured.trim()) return configured.replace(/\\/$/, '');
 
             // Same-origin: serve frontend and API from the same Worker on the same port
             // All /api/* routes are handled by the Worker
@@ -657,9 +659,9 @@ const showPassword = ref(false);
                 const authFetch = async (url, options = {}) => {
                     if(!options.headers) options.headers = {};
                     if(token.value) {
-                        options.headers['Authorization'] = `Bearer ${token.value}`;
+                        options.headers['Authorization'] = \`Bearer \${token.value}\`;
                     }
-                    const res = await fetch(`${API_BASE}${url}`, options);
+                    const res = await fetch(\`\${API_BASE}\${url}\`, options);
                     if (res.status === 401) {
                         // Token invalid/expired
                         logout();
@@ -700,12 +702,12 @@ formData.append('portfolio', authForm.value.github || '');
                             formData.append('skills', authForm.value.skills.join(', '));
                             formData.append('resume', authResumeFile.value);
                             
-                            res = await fetch(`${API_BASE}/api/auth/register`, {
+                            res = await fetch(\`\${API_BASE}/api/auth/register\`, {
                                 method: 'POST',
                                 body: formData
                             });
                         } else {
-                            res = await fetch(`${API_BASE}/api/auth/login`, {
+                            res = await fetch(\`\${API_BASE}/api/auth/login\`, {
                                 method: 'POST',
                                 headers: {'Content-Type': 'application/json'},
                                 body: JSON.stringify({username: authForm.value.username, password: authForm.value.password})
@@ -863,7 +865,7 @@ formData.append('portfolio', authForm.value.github || '');
 if (!draftBody.value || confirm("This will discard your current draft. Continue?")) {
                          draftBody.value = '';
                          const applicantName = user.value?.name || user.value?.username || '';
-                         emailSubject.value = `Marketing Internship Application (May-June 2026) - ${applicantName}`;
+                         emailSubject.value = \`Marketing Internship Application (May-June 2026) - \${applicantName}\`;
                          currentPage.value = 'draft';
                     } else {
                         currentPage.value = 'draft';
@@ -871,7 +873,7 @@ if (!draftBody.value || confirm("This will discard your current draft. Continue?
                 };
 
                 const ignoreCompany = async (company) => {
-                    if(!confirm(`Are you sure you want to ignore ${company.Name}? It will be removed from your list.`)) return;
+                    if(!confirm(\`Are you sure you want to ignore \${company.Name}? It will be removed from your list.\`)) return;
                     try {
                         await authFetch('/api/ignore', {
                             method: 'POST',
@@ -1026,12 +1028,12 @@ if (!draftBody.value || confirm("This will discard your current draft. Continue?
                     selectedCompany.value = c;
                     draftBody.value = c.drafted_email || '';
                     const applicantName = user.value?.name || user.value?.username || '';
-                    emailSubject.value = `Marketing Internship Application (May-June 2026) - ${applicantName}`;
+                    emailSubject.value = \`Marketing Internship Application (May-June 2026) - \${applicantName}\`;
                     currentPage.value = 'draft';
                 };
                 
                 const addEmail = (c) => {
-                    const newEmail = prompt(`Please enter a valid target email for ${c.Name}:`);
+                    const newEmail = prompt(\`Please enter a valid target email for \${c.Name}:\`);
                     if(newEmail && newEmail.includes('@')) {
                         c.Email = newEmail;
                         // Just an optimistic update, it saves when you click Send/Draft
@@ -1104,7 +1106,7 @@ if (!draftBody.value || confirm("This will discard your current draft. Continue?
                             formData.append('to_email', c.Email);
                             
                             const applicantName = user.value?.name || user.value?.username || '';
-                            formData.append('subject', `Marketing Internship Application (May-June 2026) - ${applicantName}`);
+                            formData.append('subject', \`Marketing Internship Application (May-June 2026) - \${applicantName}\`);
                             
                             formData.append('body', c.drafted_email || '');
                             
@@ -1172,3 +1174,4 @@ if (!draftBody.value || confirm("This will discard your current draft. Continue?
     </script>
 </body>
 </html>
+`;

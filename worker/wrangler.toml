@@ -1,0 +1,16 @@
+name = "intern-tracker"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "intern-tracker-db"
+database_id = "e1bab8b9-69f9-40ee-ad18-70b1556b9d86"
+
+[[r2_buckets]]
+binding = "RESUMES"
+bucket_name = "intern-tracker-resumes"
+
+[triggers]
+crons = ["* * * * *"]

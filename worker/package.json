@@ -1,0 +1,21 @@
+{
+  "name": "intern-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 execute intern-tracker-db --local --file=migrations/0001_initial.sql",
+    "db:migrate:remote": "wrangler d1 execute intern-tracker-db --remote --file=migrations/0001_initial.sql",
+    "db:seed": "wrangler d1 execute intern-tracker-db --local --file=migrations/0002_seed_companies.sql",
+    "db:seed:remote": "wrangler d1 execute intern-tracker-db --remote --file=migrations/0002_seed_companies.sql"
+  },
+  "dependencies": {
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241106.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.84.0"
+  }
+}

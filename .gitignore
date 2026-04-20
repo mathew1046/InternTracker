@@ -6,7 +6,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-data/
 
 # Python
 __pycache__/
@@ -22,11 +21,12 @@ applications.db
 # Uploads / Data
 backend/uploads/
 uploads/
+data/
 
 # OS generated files
 .DS_Store
 .DS_Store?
-._*
+.*_
 .Spotlight-V100
 .Trashes
 ehthumbs.db
@@ -37,3 +37,93 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Wrangler
+.wrangler/
+worker/.wrangler/
+
+# Build
+worker/dist/
+
+# Local dev overrides (not to commit)
+worker/.dev.vars
+worker/src/companies.ts
+worker/src/frontend.html
+
+# npm/yarn cache
+.npm
+.yarn
+
+# Docker
+*.log
+.Dockerfile
+.dockerignore
+
+# Misc
+*.tmp
+*.bak
+*.orig
+.DO_NOT_COMMIT_ARTIFACTS/
+
+# TypeScript
+*.tsbuildinfo
+
+# Coverage
+coverage/
+*.lcov
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs
+logs/
+*.log
+debug.log
+
+# Environment files containing secrets (already in env/, but listed for clarity)
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+
+# Vite
+.vite/
+dist/
+out/
+
+# Compiled WASM (if any)
+*.wasm
+
+# Ignore the generated files that shouldn't be committed
+worker/__generated__/
+worker/imports/
+worker/.next/
+worker/public/_
+worker/src/__tests__/
+worker/jest.config.*
+worker/ts-jest.config.*
+
+# npm/yarn cache
+.npm
+.yarn
